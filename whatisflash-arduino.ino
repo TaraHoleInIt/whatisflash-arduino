@@ -20,10 +20,10 @@
 #define Config_SPI_Pump_AVRSPI
 
 #define Config_Data_FrameDelay_MS 16
-#define Config_Data_FrameCount 29
-#define Config_Data_FrameSize ( 96 * 64 )
-#define Config_Init_Length 7
-#define Config_Data_Offset 7
+#define Config_Data_FrameCount 15
+#define Config_Data_FrameSize ( ( 96 * 64 ) * 2 )
+#define Config_Init_Length 0
+#define Config_Data_Offset 0
 
 // Uncomment this if you're setting Config_Pin_LCD_RST
 // and you're going to use an IO line to control LCD reset.
@@ -31,6 +31,8 @@
 #define Config_LCD_Reset_Time_MS 50
 
 #define Config_LCD_HIGH_Wait 500
+
+#define Config_Have_Arduino_LCD
 
 #define Config_Pin_Flash_CS 10
 #define Config_Pin_LCD_CS 9
@@ -44,6 +46,14 @@ extern void FlashPump_AVRUSI( const uint32_t Length );
 extern void FlashPump_AVRSPI( const uint32_t Length );
 
 extern void FlashPump_Generic( const uint32_t Length );
+
+#if defined Config_Have_Arduino_LCD
+  #define Config_Pin_SPI_DO 11
+
+  #include "lcdgfx.h"
+  
+  DisplaySSD1331_96x64x16_SPI LCD( Config_Pin_LCD_RST, {-1, Config_Pin_LCD_CS, Config_Pin_LCD_DC, 0,-1,-1} ); // Use this line for Atmega328p
+#endif
 
 void FlashRead( const uint32_t Address, const uint32_t Length ) {
   uint32_t i = 0;
@@ -63,6 +73,12 @@ void FlashRead( const uint32_t Address, const uint32_t Length ) {
       digitalWrite( Config_Pin_LCD_CS, LOW );
 #endif
 
+      // HACKHACKHACK
+      // Set the SPI DO pin to an input to prevent interference
+#if defined Config_Have_Arduino_LCD
+      pinMode( Config_Pin_SPI_DO, INPUT );
+#endif
+
 #if defined Config_SPI_Pump_Generic
       FlashPump_Generic( Length );
 #elif defined Config_SPI_Pump_AVRSW
@@ -74,6 +90,12 @@ void FlashRead( const uint32_t Address, const uint32_t Length ) {
 #else
       FlashPump_Generic( Length );
 #endif
+
+      // HACKHACKHACK
+      // Restore SPI DO to an output
+#if defined Config_Have_Arduino_LCD
+      pinMode( Config_Pin_SPI_DO, OUTPUT );
+#endif
       
 #if defined Config_Pin_LCD_CS
       digitalWrite( Config_Pin_LCD_CS, HIGH );
@@ -83,10 +105,10 @@ void FlashRead( const uint32_t Address, const uint32_t Length ) {
 }
 
 void LCD_Init( void ) {
-#if defined Config_Pin_LCD_DC
+#if defined Config_Pin_LCD_DC && defined Config_Have_Arduino_LCD
   // DC line controlled by software
   digitalWrite( Config_Pin_LCD_DC, LOW );
-    FlashRead( 0, Config_Init_Length );
+    LCD.begin( );
   digitalWrite( Config_Pin_LCD_DC, HIGH );
 #else
   // Init entirely by flash chip
